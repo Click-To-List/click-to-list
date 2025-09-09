@@ -3,7 +3,7 @@ import React from 'react';
 import logo from '../../public/assets/Logo.png';
 
 function HeaderBar() {
-  const menuItems = ['Buy', 'Sell', 'Rent', 'Moretgage', 'Blog'];
+  const menuItems = ['Buy', 'Sell', 'Rent', 'Mortgage', 'Blog'];
   return (
     <section>
       <div className="flex justify-between items-center mx-4 py-2">
