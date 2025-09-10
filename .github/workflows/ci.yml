@@ -26,12 +26,30 @@ jobs:
 
       # Run TypeScript type checking
       - name: Run typecheck
-        run: npm run typecheck
+        run: |
+          echo "🔍 Running TypeScript type check..."
+          if ! npm run typecheck; then
+            echo "❌ Typecheck failed! Please fix TypeScript errors before merging."
+            exit 1
+          fi
+          echo "✅ Typecheck passed!"
 
       # Run ESLint
       - name: Run lint
-        run: npm run lint
+        run: |
+          echo "🔍 Running ESLint..."
+          if ! npm run lint; then
+            echo "❌ Linting failed! Please fix ESLint errors before merging."
+            exit 1
+          fi
+          echo "✅ Lint passed!"
 
       # Run build
       - name: Run build
-        run: npm run build
+        run: |
+          echo "🔍 Building project..."
+          if ! npm run build; then
+            echo "❌ Build failed! Please fix build errors before merging."
+            exit 1
+          fi
+          echo "✅ Build succeeded!"
