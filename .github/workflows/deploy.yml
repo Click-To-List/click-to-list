@@ -1,0 +1,87 @@
+name: Deploy to EC2 via OIDC + short-lived GH token
+
+on:
+  push:
+    branches: [ dev, staging, main ]
+
+permissions:
+  id-token: write   # for AWS OIDC
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+  PARAM_TOKEN_PATH: /deploy/github/token
+  APP_TAG: ctl
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - branch: dev
+            environment: dev
+            role_arn: ${{ secrets.AWS_ROLE_DEV_ARN }}
+            ec2_env: dev
+            secret_name: ctl/app/dev-main
+          - branch: staging
+            environment: staging
+            role_arn: ${{ secrets.AWS_ROLE_STAGING_ARN }}
+            ec2_env: staging
+            secret_name: ctl/app/staging-main
+          - branch: main
+            environment: prod
+            role_arn: ${{ secrets.AWS_ROLE_PROD_ARN }}
+            ec2_env: prod
+            secret_name: ctl/app/prod-main
+
+    if: contains(fromJson('["refs/heads/dev","refs/heads/staging","refs/heads/main"]'), github.ref)
+    environment: ${{ matrix.environment }}
+
+    steps:
+      - name: Checkout (for metadata only)
+        uses: actions/checkout@v4
+
+      - name: Configure AWS creds via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ matrix.role_arn }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # Create a short-lived GitHub App installation token
+      - name: Mint GitHub App installation token
+        id: app_token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.GH_APP_ID }}
+          installation-id: ${{ secrets.GH_APP_INSTALLATION_ID }}
+          private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
+
+      # Put it into SSM Parameter Store SecureString for the instance to read
+      - name: Put short-lived token in SSM ParamStore
+        run: |
+          aws ssm put-parameter \
+            --name "${PARAM_TOKEN_PATH}" \
+            --type "SecureString" \
+            --value "${{ steps.app_token.outputs.token }}" \
+            --overwrite
+
+      # Trigger deploy on instances with tags
+      - name: SSM RunCommand - deploy
+        run: |
+          BRANCH="${{ matrix.environment == 'prod' && 'main' || matrix.environment }}"
+          aws ssm send-command \
+            --document-name "AWS-RunShellScript" \
+            --targets "Key=tag:App,Values=${{ env.APP_TAG }}" "Key=tag:Environment,Values=${{ matrix.ec2_env }}" \
+            --parameters commands="['/home/ubuntu/deploy.sh ${{
+              matrix.ec2_env }} ${BRANCH} ${PARAM_TOKEN_PATH} ${{ matrix.secret_name }}']" \
+            --comment "Deploy $APP_TAG $GITHUB_SHA to ${{ matrix.ec2_env }}" \
+            --max-concurrency "1" \
+            --max-errors "0" \
+            --region ${{ env.AWS_REGION }}
+
+      # Clean up token parameter (best-effort)
+      - name: Delete temporary token parameter
+        if: always()
+        run: |
+          aws ssm delete-parameter --name "${PARAM_TOKEN_PATH}" || true
