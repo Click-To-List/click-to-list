@@ -1,79 +1,90 @@
-name: Deploy CTL Nodse API via OIDC + SSM
+name: Deploy to EC2 via OIDC + SSM
 
 on:
   push:
-    branches: [ dev, staging, main ]
+    branches: [ dev, stage, main ]
 
 permissions:
-  id-token: write   # REQUIRED for OIDC
+  id-token: write   # required for OIDC
   contents: read
 
 env:
-  APP_NAME: ctl-api
-  #ARTIFACT_BUCKET: my-ci-artifacts-bucket
-  AWS_REGION: ${{ secrets.AWS_REGION }}
+  AWS_REGION: us-east-1
+  PARAM_TOKEN_PATH: /deploy/github/token
+  APP_TAG: ctl-api
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
-    # Map branch -> env -> role -> instance tag
-    strategy:
-      matrix:
-        include:
-          - branch: dev
-            environment: dev
-            role_arn: ${{ secrets.AWS_ROLE_DEV_ARN }}
-            ssm_env: dev
-            target_env_tag: dev
-          - branch:  stage
-            environment: staging
-            role_arn: ${{ secrets.AWS_ROLE_STAGING_ARN }}
-            ssm_env: staging
-            target_env_tag: staging
-          - branch: main
-            environment: prod
-            role_arn: ${{ secrets.AWS_ROLE_PROD_ARN }}
-            ssm_env: prod
-            target_env_tag: prod
-
-    if: contains(fromJson('["refs/heads/dev","refs/heads/staging","refs/heads/main"]'), github.ref)
-
-    environment: ${{ matrix.environment }}
-
     steps:
-      - name: Check out
+      - name: Checkout (for metadata only)
         uses: actions/checkout@v4
 
-      - name: Use Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: 'npm'
-
-      - name: Install deps
-        run: npm ci
-
-      - name: Run tests
-        run: npm test --if-present
-
-      - name: Build
-        run: npm run build --if-present
+      - name: Determine environment / role based on branch
+        id: select
+        shell: bash
+        run: |
+          BRANCH="${GITHUB_REF##*/}"
+          case "$BRANCH" in
+            dev)
+              echo "ROLE_ARN=${{ secrets.AWS_ROLE_DEV_ARN }}" >> $GITHUB_ENV
+              echo "EC2_ENV=dev" >> $GITHUB_ENV
+              echo "SECRET_NAME=myapi/env/dev" >> $GITHUB_ENV
+              echo "DEPLOY_BRANCH=dev" >> $GITHUB_ENV
+              ;;
+            staging)
+              echo "ROLE_ARN=${{ secrets.AWS_ROLE_STAGING_ARN }}" >> $GITHUB_ENV
+              echo "EC2_ENV=staging" >> $GITHUB_ENV
+              echo "SECRET_NAME=myapi/env/staging" >> $GITHUB_ENV
+              echo "DEPLOY_BRANCH=staging" >> $GITHUB_ENV
+              ;;
+            main)
+              echo "ROLE_ARN=${{ secrets.AWS_ROLE_PROD_ARN }}" >> $GITHUB_ENV
+              echo "EC2_ENV=prod" >> $GITHUB_ENV
+              echo "SECRET_NAME=myapi/env/prod" >> $GITHUB_ENV
+              echo "DEPLOY_BRANCH=main" >> $GITHUB_ENV
+              ;;
+            *)
+              echo "Unsupported branch: $BRANCH"; exit 1
+              ;;
+          esac
 
       - name: Configure AWS credentials via OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ matrix.role_arn }}
+          role-to-assume: ${{ env.ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Trigger SSM deploy on target instances
+      # Mint short-lived GitHub App token (if you're using the App-based pull)
+      - name: Mint GitHub App installation token
+        id: app_token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.GH_APP_ID }}
+          installation-id: ${{ secrets.GH_APP_INSTALLATION_ID }}
+          private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
+
+      - name: Put short-lived token in SSM ParamStore
+        run: |
+          aws ssm put-parameter \
+            --name "${{ env.PARAM_TOKEN_PATH }}" \
+            --type "SecureString" \
+            --value "${{ steps.app_token.outputs.token }}" \
+            --overwrite
+
+      - name: Deploy via SSM to tagged instances
         run: |
           aws ssm send-command \
             --document-name "AWS-RunShellScript" \
-            --comment "Deploy $APP_NAME $GITHUB_SHA" \
-            --targets "Key=tag:Environment,Values=${{ matrix.target_env_tag }}" "Key=tag:App,Values=${{ env.APP_NAME }}" \
-            --parameters 'commands=["sudo /opt/your-api/deploy.sh s3://${{ env.ARTIFACT_BUCKET }}/${{ env.APP_NAME }}/${{ github.sha }}.tar.gz ${{ matrix.ssm_env }}"]' \
-            --timeout-seconds 600 \
+            --targets "Key=tag:App,Values=${{ env.APP_TAG }}" "Key=tag:Environment,Values=${{ env.EC2_ENV }}" \
+            --parameters commands="['sudo /home/ubuntu/deploy.sh ${{ env.EC2_ENV }} ${{ env.DEPLOY_BRANCH }} ${{ env.PARAM_TOKEN_PATH }} ${{ env.SECRET_NAME }}']" \
+            --comment "Deploy ${{ env.APP_TAG }} $GITHUB_SHA to ${{ env.EC2_ENV }}" \
             --max-concurrency "1" \
             --max-errors "0" \
             --region ${{ env.AWS_REGION }}
+
+      - name: Delete temporary token parameter
+        if: always()
+        run: |
+          aws ssm delete-parameter --name "${{ env.PARAM_TOKEN_PATH }}" || true
