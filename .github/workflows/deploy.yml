@@ -26,7 +26,7 @@ jobs:
             role_arn: ${{ secrets.AWS_ROLE_DEV_ARN }}
             ssm_env: dev
             target_env_tag: dev
-          - branch: staging
+          - branch: stage
             environment: staging
             role_arn: ${{ secrets.AWS_ROLE_STAGING_ARN }}
             ssm_env: staging
@@ -37,7 +37,7 @@ jobs:
             ssm_env: prod
             target_env_tag: prod
 
-    if: contains(fromJson('["refs/heads/dev","refs/heads/staging","refs/heads/main"]'), github.ref)
+    if: contains(fromJson('["refs/heads/dev","refs/heads/stage","refs/heads/main"]'), github.ref)
 
     environment: ${{ matrix.environment }}
 
