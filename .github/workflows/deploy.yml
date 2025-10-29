@@ -51,24 +51,34 @@ jobs:
           esac
 
       - name: Debug OIDC token (claims)
+        shell: bash
         run: |
           set -euo pipefail
-          # Request an OIDC token for the same audience you pass to the AWS action
           TOKEN_JSON="$(curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
             "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=sts.amazonaws.com")"
           echo "$TOKEN_JSON" | jq -r .value > /tmp/idtoken.jwt
 
+          b64url_decode() {
+            local INPUT="$1"
+            # Convert base64url -> base64 and pad
+            local PAD=$(( (4 - ${#INPUT} % 4) % 4 ))
+            printf '%s' "$INPUT" | tr '_-' '/+' | sed -E "s/$/$(printf '=%.0s' $(seq 1 $PAD))/" | base64 -d
+          }
+
+          HEADER="$(cut -d. -f1 /tmp/idtoken.jwt)"
+          PAYLOAD="$(cut -d. -f2 /tmp/idtoken.jwt)"
+
           echo "SUB (subject):"
-          cut -d. -f2 /tmp/idtoken.jwt | base64 -d | jq -r .sub
+          b64url_decode "$PAYLOAD" | jq -r .sub
 
           echo "AUD (audience):"
-          cut -d. -f2 /tmp/idtoken.jwt | base64 -d | jq -r .aud
+          b64url_decode "$PAYLOAD" | jq -r .aud
 
           echo "REF (git ref):"
-          cut -d. -f2 /tmp/idtoken.jwt | base64 -d | jq -r .ref
+          b64url_decode "$PAYLOAD" | jq -r .ref
 
           echo "REPO / OWNER / EVENT:"
-          cut -d. -f2 /tmp/idtoken.jwt | base64 -d | jq -r '.repository, .repository_owner, .event_name'
+          b64url_decode "$PAYLOAD" | jq -r '.repository, .repository_owner, .event_name'
 
       - name: Configure AWS credentials via OIDC
         uses: aws-actions/configure-aws-credentials@v4
