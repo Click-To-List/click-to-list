@@ -52,7 +52,7 @@ jobs:
 
       - name: Manual STS assume-role-with-web-identity (diagnostic)
         env:
-          ROLE_ARN: arn:aws:iam::<ACCOUNT_ID>:role/<ROLE_NAME>
+          ROLE_ARN: arn:aws:iam::484908221623:role/GitHubOIDCDeploy-DevNew
         run: |
           set -euo pipefail
           TOKEN_JSON="$(curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
