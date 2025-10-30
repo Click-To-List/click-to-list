@@ -93,7 +93,7 @@ jobs:
           aws ssm send-command \
             --document-name "AWS-RunShellScript" \
             --targets "Key=tag:App,Values=${{ env.APP_TAG }}" "Key=tag:Environment,Values=${{ env.EC2_ENV }}" \
-            --parameters commands="['sudo /home/ubuntu/deploy.sh ${{ env.EC2_ENV }} ${{ env.DEPLOY_BRANCH }} ${{ env.PARAM_TOKEN_PATH }} ${{ env.SECRET_NAME }}']" \
+            --parameters 'commands=["sudo -u ubuntu -H bash -lc \"/home/ubuntu/deploy.sh ${{ env.EC2_ENV }} ${{ env.DEPLOY_BRANCH }} ${{ env.PARAM_TOKEN_PATH }} ${{ env.SECRET_NAME }}\""]' \
             --comment "Deploy ${{ env.APP_TAG }} $GITHUB_SHA to ${{ env.EC2_ENV }}" \
             --max-concurrency "1" \
             --max-errors "0" \
