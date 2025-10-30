@@ -33,7 +33,7 @@ jobs:
               echo "SECRET_NAME=myapi/env/dev" >> $GITHUB_ENV
               echo "DEPLOY_BRANCH=dev" >> $GITHUB_ENV
               ;;
-            staging)
+            stage)
               echo "ROLE_ARN=${{ secrets.AWS_ROLE_STAGING_ARN }}" >> $GITHUB_ENV
               echo "EC2_ENV=staging" >> $GITHUB_ENV
               echo "SECRET_NAME=myapi/env/staging" >> $GITHUB_ENV
