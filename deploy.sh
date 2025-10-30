@@ -5,9 +5,11 @@ set -euo pipefail
 export NVM_DIR="$HOME/.nvm"
 if [ -s "$NVM_DIR/nvm.sh" ]; then
   . "$NVM_DIR/nvm.sh"
-  nvm use 20  # or whatever version you need
+  nvm use 22  # or whatever version you need
 fi
 
+# Make deploy file executable
+chmod +x /home/ubuntu/ctl/api/deploy.sh
 
 # --- Config ---
 APP_DIR="/home/ubuntu/ctl/api"           # path to your git working copy
