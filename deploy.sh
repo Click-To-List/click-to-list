@@ -1,13 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Load NVM
-export NVM_DIR="$HOME/.nvm"
-if [ -s "$NVM_DIR/nvm.sh" ]; then
-  . "$NVM_DIR/nvm.sh"
-  nvm use 22  # or whatever version you need
-fi
-
 # Make deploy file executable
 chmod +x /home/ubuntu/ctl/api/deploy.sh
 
@@ -68,6 +61,13 @@ else
   git checkout "$BRANCH"
 fi
 git pull --ff-only origin "$BRANCH"
+
+# Load NVM
+export NVM_DIR="$HOME/.nvm"
+if [ -s "$NVM_DIR/nvm.sh" ]; then
+  . "$NVM_DIR/nvm.sh"
+  nvm use 22  # or whatever version you need
+fi
 
 # --- Install deps and build (optional) ---
 # If you want prod-only deps, use: NODE_ENV=production npm install --omit=dev
