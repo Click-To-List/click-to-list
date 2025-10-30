@@ -8,7 +8,7 @@ if [ -s "$NVM_DIR/nvm.sh" ]; then
   nvm use 22  # or whatever version you need
 fi
 
-# Make deploy file executable
+# Make deploy file executable 
 chmod +x /home/ubuntu/ctl/api/deploy.sh
 
 # --- Config ---
