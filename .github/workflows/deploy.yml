@@ -12,7 +12,7 @@ env:
   AWS_REGION: us-east-1
   PARAM_TOKEN_PATH: /deploy/github/token
   APP_TAG: ctl-api
-
+  
 jobs:
   deploy:
     runs-on: ubuntu-latest
