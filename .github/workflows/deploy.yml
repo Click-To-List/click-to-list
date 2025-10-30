@@ -1,5 +1,5 @@
 name: Deploy to EC2 via OIDC + SSM
- 
+
 on:
   push:
     branches: [ dev, stage, main ]
