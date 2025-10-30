@@ -77,13 +77,13 @@ if jq -e '.scripts.build' package.json >/dev/null 2>&1; then
 fi
 
 # --- Restart PM2 ---
-if command -v pm2 >/dev/null 2>&1; then
-  if pm2 describe "$PM2_APP_NAME" >/dev/null 2>&1; then
-    pm2 reload "$PM2_APP_NAME" --update-env
+if command -v npx pm2 >/dev/null 2>&1; then
+  if npx pm2 describe "$PM2_APP_NAME" >/dev/null 2>&1; then
+    npx pm2 reload "$PM2_APP_NAME" --update-env
   else
-    pm2 start "npm -- start" --name "$PM2_APP_NAME" --update-env
+    npx pm2 start "npm -- start" --name "$PM2_APP_NAME" --update-env
   fi
-  pm2 save
+  npx pm2 save
 else
   echo "WARNING: pm2 not found in PATH. Skipping PM2 restart." >&2
 fi
