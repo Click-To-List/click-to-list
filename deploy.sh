@@ -149,6 +149,9 @@ else
 fi
 git pull --ff-only origin "$BRANCH"
 
+# --- Build env before install/build ---
+write_env_from_secrets "$SECRET_IDS" "$REGION" "$ENV_FILE"
+
 # Load NVM
 export NVM_DIR="$HOME/.nvm"
 if [ -s "$NVM_DIR/nvm.sh" ]; then
