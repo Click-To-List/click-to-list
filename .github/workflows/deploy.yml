@@ -50,21 +50,6 @@ jobs:
               ;;
           esac
 
-      - name: Manual STS assume-role-with-web-identity (diagnostic)
-        env:
-          ROLE_ARN: arn:aws:iam::484908221623:role/GitHubOIDCDeploy-DevNew
-        run: |
-          set -euo pipefail
-          TOKEN_JSON="$(curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=sts.amazonaws.com")"
-          TOKEN="$(echo "$TOKEN_JSON" | jq -r .value)"
-          aws sts assume-role-with-web-identity \
-            --role-arn "$ROLE_ARN" \
-            --role-session-name gha-oidc-test \
-            --web-identity-token "$TOKEN" \
-            --duration-seconds 900 \
-            --region us-east-1
-
       - name: Configure AWS credentials via OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
